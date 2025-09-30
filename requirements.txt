@@ -1,0 +1,17 @@
+# Flask: Web framework for building the chat application
+flask
+
+# Flask-SocketIO: Enables real-time bidirectional communication between clients and server
+flask-socketio
+
+# SQLAlchemy: ORM (Object Relational Mapper) for interacting with the database
+sqlalchemy
+
+# pyodbc: Database driver to connect Python with SQL Server or other ODBC databases
+pyodbc
+
+# python-dotenv: Loads environment variables from a .env file
+python-dotenv
+
+# pytz: Provides timezone definitions for accurate datetime handling
+pytz

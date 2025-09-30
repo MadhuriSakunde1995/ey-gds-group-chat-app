@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{ client_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}" />
+  </head>
+  <body>
+    <div class="chat-container">
+      <div class="chat-header">
+        <span>{{ client_name }}</span>
+      </div>
+      <div id="chat">
+        <div id="loadingIndicator" class="loading-indicator">
+          Loading older messages...
+        </div>
+      </div>
+      <form id="chatForm" class="chat-footer">
+        <input
+          type="text"
+          id="msgInput"
+          autocomplete="off"
+          placeholder="Type a message..."
+          required
+        />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+      // Pass the client name to JavaScript as a global variable
+      window.CLIENT_NAME = "{{ client_name }}";
+    </script>
+    <script src="{{ url_for('static', filename='chat.js') }}"></script>
+  </body>
+</html>
