@@ -7,6 +7,7 @@ from src.database import initialize_database, get_last_block_hash, get_ledger_bl
 from src.blockchain import calculate_hash, broadcast_block_to_peers, validate_chain
 from src.utils import get_utc_timestamp, convert_utc_to_local, safe_emit, set_socketio
 from src.peer_discovery import start_tcp_server, connect_to_peers, periodic_ledger_sync
+from src.connect_tunnel_interface import monitor_tunnel_status
 from sqlalchemy import text
 
 app = Flask(__name__)  # Flask will automatically look for 'templates' and 'static' folders
@@ -17,7 +18,7 @@ set_socketio(socketio)
 
 @app.route("/")
 def index():
-    return render_template("chat.html", client_name=CLIENT_NAME)  # Changed: use render_template
+    return render_template("chat.html", client_name=CLIENT_NAME)
 
 @socketio.on("send_message")
 def handle_send_message(msg):
@@ -66,11 +67,29 @@ def handle_check_new_messages():
     safe_emit("chat_history", get_ledger_blocks(0, 50))
 
 if __name__ == "__main__":
+    # Initialize database
     initialize_database()
+
+    # Validate blockchain
     if not validate_chain():
         logging.warning("[Startup] Local chain invalid. Sync may be needed.")
+
+    # Start tunnel monitoring thread
+    logging.info("[Startup] Starting tunnel monitor...")
+    threading.Thread(target=monitor_tunnel_status, daemon=True).start()
+
+    # Start TCP server thread
+    logging.info("[Startup] Starting TCP server...")
     threading.Thread(target=start_tcp_server, daemon=True).start()
+
+    # Start peer connection thread
+    logging.info("[Startup] Starting peer connections...")
     threading.Thread(target=connect_to_peers, daemon=True).start()
+
+    # Start periodic sync thread
+    logging.info("[Startup] Starting periodic ledger sync...")
     threading.Thread(target=periodic_ledger_sync, daemon=True).start()
+
+    # Start Flask web server
     logging.info(f"[Web] Starting chat app on port {FLASK_WEB_PORT}")
     socketio.run(app, host="0.0.0.0", port=FLASK_WEB_PORT, debug=False)

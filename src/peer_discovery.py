@@ -5,10 +5,12 @@ import logging
 import json
 from datetime import datetime
 from sqlalchemy import text
+import platform
 from src.blockchain import validate_chain, handle_new_block
 from src.utils import safe_emit, get_utc_timestamp, convert_utc_to_local
-from src.config import TCP_SERVER_PORT, PEER_LIST, MAX_RETRIES, RETRY_DELAY, SYNC_INTERVAL, client_semaphore, client_sockets
+from src.config import ADAPTER_NAME, TCP_SERVER_PORT, PEER_LIST, MAX_RETRIES, RETRY_DELAY, SYNC_INTERVAL, client_semaphore, client_sockets
 from src.database import get_ledger_count, get_ledger_blocks, get_last_block_hash, engine
+from src.connect_tunnel_interface import list_all_network_interfaces, is_connect_tunnel_active, get_connect_tunnel_ip, is_ip_in_tunnel_network, get_connect_tunnel_network
 
 BATCH_SIZE = 50  # number of blocks to sync per batch
 
@@ -104,14 +106,69 @@ def listen_to_peer(sock, ip, port):
 
 # ------------------------ TCP Server ------------------------ #
 def start_tcp_server():
+    """
+    Start TCP server bound to Connect Tunnel interface only
+    """
+    system = platform.system()
+    logging.info(f"[TCP] Starting server on {system}")
+
+    # List all interfaces for debugging
+    list_all_network_interfaces()
+
+    # Check if Connect Tunnel is active
+    if not is_connect_tunnel_active():
+        logging.error("[TCP] Connect Tunnel is not active. Server not started.")
+        logging.info("[TCP] Make sure 'Connect Tunnel' VPN/adapter is connected")
+        return
+
+    # Get tunnel IP and network
+    tunnel_ip, interface = get_connect_tunnel_ip(ADAPTER_NAME)
+    tunnel_network = get_connect_tunnel_network()
+
+    if not tunnel_ip or not tunnel_network:
+        logging.error("[TCP] Cannot get Connect Tunnel configuration. Server not started.")
+        return
+
+    # Create and configure server socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind(("0.0.0.0", TCP_SERVER_PORT))
-    server.listen(5)
-    logging.info(f"[TCP] Server running on {TCP_SERVER_PORT}")
-    while True:
-        conn, addr = server.accept()
-        threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+
+    try:
+        # Bind only to the Connect Tunnel IP
+        server.bind((tunnel_ip, TCP_SERVER_PORT))
+        server.listen(5)
+
+        logging.info("=" * 60)
+        logging.info(f"[TCP] ✓ Server STARTED successfully")
+        logging.info(f"[TCP] Interface: {interface}")
+        logging.info(f"[TCP] Listening on: {tunnel_ip}:{TCP_SERVER_PORT}")
+        logging.info(f"[TCP] Network range: {tunnel_network}")
+        logging.info(f"[TCP] Platform: {system}")
+        logging.info("=" * 60)
+
+        while True:
+            try:
+                conn, addr = server.accept()
+                client_ip = addr[0]
+
+                # Validate that connection is from tunnel network
+                if is_ip_in_tunnel_network(client_ip):
+                    logging.info(f"[TCP] ✓ ACCEPTED connection from {addr}")
+                    import threading
+                    threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+                else:
+                    logging.warning(f"[TCP] ✗ REJECTED connection from {addr}")
+                    logging.warning(f"[TCP]   Reason: IP not in tunnel network {tunnel_network}")
+                    conn.close()
+
+            except Exception as e:
+                logging.error(f"[TCP] Error accepting connection: {e}")
+
+    except Exception as e:
+        logging.error(f"[TCP] Failed to start server: {e}")
+        logging.error(f"[TCP] Could not bind to {tunnel_ip}:{TCP_SERVER_PORT}")
+    finally:
+        server.close()
 
 # ------------------------ Peer Connector ------------------------ #
 def connect_to_peers():

@@ -17,6 +17,7 @@ logging.basicConfig(
 # --- Env & App Config ---
 load_dotenv()
 CLIENT_NAME = os.getenv("CLIENT_NAME", "DefaultUser")
+ADAPTER_NAME = os.getenv("ADAPTER_NAME", None)
 TCP_SERVER_PORT = int(os.getenv("TCP_SERVER_PORT", 5001))
 FLASK_WEB_PORT = int(os.getenv("FLASK_WEB_PORT", 8001))
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", 5))
