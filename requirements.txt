@@ -20,3 +20,4 @@ pytz
 psutil
 
 # platform: Provides system-specific information (OS, Python version, etc.)
+platform
