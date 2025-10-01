@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 from sqlalchemy import text
 import platform
+import os
 from src.blockchain import validate_chain, handle_new_block
 from src.utils import safe_emit, get_utc_timestamp, convert_utc_to_local
 from src.config import (
@@ -28,8 +29,6 @@ from src.connect_tunnel_interface import (
     list_all_network_interfaces,
     is_connect_tunnel_active,
     get_connect_tunnel_ip,
-    is_ip_in_tunnel_network,
-    get_connect_tunnel_network,
 )
 
 BATCH_SIZE = 50  # number of blocks to sync per batch
@@ -145,6 +144,7 @@ def listen_to_peer(sock, ip, port):
 def start_tcp_server():
     """
     Start TCP server bound to Connect Tunnel interface only
+    Exits application if Connect Tunnel is not active
     """
     system = platform.system()
     logging.info(f"[TCP] Starting server on {system}")
@@ -155,15 +155,17 @@ def start_tcp_server():
     # Check if Connect Tunnel is active
     if not is_connect_tunnel_active():
         logging.error("[TCP] Connect Tunnel is not active. Server not started.")
-        logging.info("[TCP] Make sure 'Connect Tunnel' VPN/adapter is connected")
-        return
+        logging.error("[TCP] Make sure 'Connect Tunnel' VPN/adapter is connected")
+        logging.error("[TCP] APPLICATION EXITING...")
+        os._exit(1)  # Force exit entire process
 
     # Get tunnel IP
     tunnel_ip, interface = get_connect_tunnel_ip(ADAPTER_NAME)
 
     if not tunnel_ip:
         logging.error("[TCP] Cannot get Connect Tunnel IP. Server not started.")
-        return
+        logging.error("[TCP] APPLICATION EXITING...")
+        os._exit(1)  # Force exit entire process
 
     # Create and configure server socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -185,7 +187,6 @@ def start_tcp_server():
         while True:
             try:
                 conn, addr = server.accept()
-                # client_ip = addr[0]
 
                 # Since we're bound to the tunnel interface,
                 # all connections are already coming through the tunnel
@@ -201,6 +202,8 @@ def start_tcp_server():
     except Exception as e:
         logging.error(f"[TCP] Failed to start server: {e}")
         logging.error(f"[TCP] Could not bind to {tunnel_ip}:{TCP_SERVER_PORT}")
+        logging.error("[TCP] APPLICATION EXITING...")
+        os._exit(1)  # Force exit entire process
     finally:
         server.close()
 

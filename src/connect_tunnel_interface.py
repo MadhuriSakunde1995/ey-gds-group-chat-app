@@ -131,29 +131,6 @@ def get_connect_tunnel_network():
         return None
 
 
-def is_ip_in_tunnel_network(client_ip):
-    """
-    Check if a client IP is within the Connect Tunnel network
-
-    Args:
-        client_ip (str): IP address to check
-
-    Returns:
-        bool: True if IP is in tunnel network
-    """
-    try:
-        tunnel_network = get_connect_tunnel_network()
-        if not tunnel_network:
-            logging.warning("[Tunnel] Cannot determine tunnel network")
-            return False
-
-        return IPv4Address(client_ip) in tunnel_network
-
-    except Exception as e:
-        logging.error(f"[Tunnel] Error checking IP: {e}")
-        return False
-
-
 def list_all_network_interfaces():
     """
     Debug function: List all network interfaces
@@ -168,22 +145,3 @@ def list_all_network_interfaces():
                 if hasattr(addr, "netmask"):
                     logging.info(f"  Netmask: {addr.netmask}")
     logging.info("=" * 40)
-
-
-def monitor_tunnel_status():
-    """
-    Continuously monitor Connect Tunnel connection status
-    Run this in a separate daemon thread
-    """
-    import time
-
-    while True:
-        time.sleep(30)  # Check every 30 seconds
-
-        if is_connect_tunnel_active():
-            tunnel_ip, interface = get_connect_tunnel_ip(ADAPTER_NAME)
-            logging.debug(
-                f"[Monitor] ✓ Connect Tunnel active: {interface} ({tunnel_ip})"
-            )
-        else:
-            logging.warning("[Monitor] ⚠ Connect Tunnel is DOWN or disconnected!")

@@ -12,7 +12,6 @@ from src.database import (
 from src.blockchain import calculate_hash, broadcast_block_to_peers, validate_chain
 from src.utils import get_utc_timestamp, convert_utc_to_local, safe_emit, set_socketio
 from src.peer_discovery import start_tcp_server, connect_to_peers, periodic_ledger_sync
-from src.connect_tunnel_interface import monitor_tunnel_status
 from sqlalchemy import text
 
 app = Flask(
@@ -96,8 +95,6 @@ if __name__ == "__main__":
         logging.warning("[Startup] Local chain invalid. Sync may be needed.")
 
     # Start tunnel monitoring thread
-    logging.info("[Startup] Starting tunnel monitor...")
-    threading.Thread(target=monitor_tunnel_status, daemon=True).start()
 
     # Start TCP server thread
     logging.info("[Startup] Starting TCP server...")
