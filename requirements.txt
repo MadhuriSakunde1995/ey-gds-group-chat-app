@@ -18,6 +18,3 @@ pytz
 
 # psutil: Cross-platform library for retrieving system information (CPU, memory, disk, network usage), useful for monitoring resources
 psutil
-
-# platform: Provides system-specific information (OS, Python version, etc.)
-platform

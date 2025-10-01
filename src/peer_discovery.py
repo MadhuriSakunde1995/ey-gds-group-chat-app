@@ -158,14 +158,11 @@ def start_tcp_server():
         logging.info("[TCP] Make sure 'Connect Tunnel' VPN/adapter is connected")
         return
 
-    # Get tunnel IP and network
+    # Get tunnel IP
     tunnel_ip, interface = get_connect_tunnel_ip(ADAPTER_NAME)
-    tunnel_network = get_connect_tunnel_network()
 
-    if not tunnel_ip or not tunnel_network:
-        logging.error(
-            "[TCP] Cannot get Connect Tunnel configuration. Server not started."
-        )
+    if not tunnel_ip:
+        logging.error("[TCP] Cannot get Connect Tunnel IP. Server not started.")
         return
 
     # Create and configure server socket
@@ -181,29 +178,22 @@ def start_tcp_server():
         logging.info(f"[TCP] ✓ Server STARTED successfully")
         logging.info(f"[TCP] Interface: {interface}")
         logging.info(f"[TCP] Listening on: {tunnel_ip}:{TCP_SERVER_PORT}")
-        logging.info(f"[TCP] Network range: {tunnel_network}")
         logging.info(f"[TCP] Platform: {system}")
+        logging.info(f"[TCP] Accepting connections from any Connect Tunnel peer")
         logging.info("=" * 60)
 
         while True:
             try:
                 conn, addr = server.accept()
-                client_ip = addr[0]
+                # client_ip = addr[0]
 
-                # Validate that connection is from tunnel network
-                if is_ip_in_tunnel_network(client_ip):
-                    logging.info(f"[TCP] ✓ ACCEPTED connection from {addr}")
-                    import threading
+                # Since we're bound to the tunnel interface,
+                # all connections are already coming through the tunnel
+                logging.info(f"[TCP] ✓ ACCEPTED connection from {addr}")
 
-                    threading.Thread(
-                        target=handle_client, args=(conn, addr), daemon=True
-                    ).start()
-                else:
-                    logging.warning(f"[TCP] ✗ REJECTED connection from {addr}")
-                    logging.warning(
-                        f"[TCP]   Reason: IP not in tunnel network {tunnel_network}"
-                    )
-                    conn.close()
+                threading.Thread(
+                    target=handle_client, args=(conn, addr), daemon=True
+                ).start()
 
             except Exception as e:
                 logging.error(f"[TCP] Error accepting connection: {e}")
