@@ -8,11 +8,32 @@ from sqlalchemy import text
 import platform
 from src.blockchain import validate_chain, handle_new_block
 from src.utils import safe_emit, get_utc_timestamp, convert_utc_to_local
-from src.config import ADAPTER_NAME, TCP_SERVER_PORT, PEER_LIST, MAX_RETRIES, RETRY_DELAY, SYNC_INTERVAL, client_semaphore, client_sockets
-from src.database import get_ledger_count, get_ledger_blocks, get_last_block_hash, engine
-from src.connect_tunnel_interface import list_all_network_interfaces, is_connect_tunnel_active, get_connect_tunnel_ip, is_ip_in_tunnel_network, get_connect_tunnel_network
+from src.config import (
+    ADAPTER_NAME,
+    TCP_SERVER_PORT,
+    PEER_LIST,
+    MAX_RETRIES,
+    RETRY_DELAY,
+    SYNC_INTERVAL,
+    client_semaphore,
+    client_sockets,
+)
+from src.database import (
+    get_ledger_count,
+    get_ledger_blocks,
+    get_last_block_hash,
+    engine,
+)
+from src.connect_tunnel_interface import (
+    list_all_network_interfaces,
+    is_connect_tunnel_active,
+    get_connect_tunnel_ip,
+    is_ip_in_tunnel_network,
+    get_connect_tunnel_network,
+)
 
 BATCH_SIZE = 50  # number of blocks to sync per batch
+
 
 # ------------------------ Client Handler ------------------------ #
 def handle_client(conn, addr):
@@ -43,12 +64,18 @@ def handle_client(conn, addr):
                     elif msg.startswith("SYNC_RESPONSE:"):
                         handle_sync_response(msg[14:])
                     else:
-                        safe_emit("receive_message", {
-                            "sender": "peer",
-                            "message": msg,
-                            "timestamp": get_utc_timestamp(),
-                            "display_timestamp": convert_utc_to_local(get_utc_timestamp())
-                        }, to_all=True)
+                        safe_emit(
+                            "receive_message",
+                            {
+                                "sender": "peer",
+                                "message": msg,
+                                "timestamp": get_utc_timestamp(),
+                                "display_timestamp": convert_utc_to_local(
+                                    get_utc_timestamp()
+                                ),
+                            },
+                            to_all=True,
+                        )
             except (ConnectionResetError, ConnectionAbortedError) as e:
                 logging.warning(f"[TCP] Connection lost with {addr}: {e}")
                 break
@@ -62,6 +89,7 @@ def handle_client(conn, addr):
         conn.close()
         client_semaphore.release()
         logging.info(f"[TCP] Client disconnected: {addr}")
+
 
 # ------------------------ Peer Listener ------------------------ #
 def listen_to_peer(sock, ip, port):
@@ -82,14 +110,22 @@ def listen_to_peer(sock, ip, port):
                     elif msg.startswith("SYNC_RESPONSE:"):
                         handle_sync_response(msg[14:])
                     else:
-                        safe_emit("receive_message", {
-                            "sender": "peer",
-                            "message": msg,
-                            "timestamp": get_utc_timestamp(),
-                            "display_timestamp": convert_utc_to_local(get_utc_timestamp())
-                        }, to_all=True)
+                        safe_emit(
+                            "receive_message",
+                            {
+                                "sender": "peer",
+                                "message": msg,
+                                "timestamp": get_utc_timestamp(),
+                                "display_timestamp": convert_utc_to_local(
+                                    get_utc_timestamp()
+                                ),
+                            },
+                            to_all=True,
+                        )
             except (ConnectionResetError, ConnectionAbortedError) as e:
-                logging.warning(f"[Peer Listen Warning] Connection closed by peer {ip}:{port} - {e}")
+                logging.warning(
+                    f"[Peer Listen Warning] Connection closed by peer {ip}:{port} - {e}"
+                )
                 break
     except Exception as e:
         logging.error(f"[Peer Listen Error] {ip}:{port} - {e}")
@@ -103,6 +139,7 @@ def listen_to_peer(sock, ip, port):
         sock.close()
         client_semaphore.release()
         logging.info(f"[Peer] Disconnected: {ip}:{port}")
+
 
 # ------------------------ TCP Server ------------------------ #
 def start_tcp_server():
@@ -126,7 +163,9 @@ def start_tcp_server():
     tunnel_network = get_connect_tunnel_network()
 
     if not tunnel_ip or not tunnel_network:
-        logging.error("[TCP] Cannot get Connect Tunnel configuration. Server not started.")
+        logging.error(
+            "[TCP] Cannot get Connect Tunnel configuration. Server not started."
+        )
         return
 
     # Create and configure server socket
@@ -155,10 +194,15 @@ def start_tcp_server():
                 if is_ip_in_tunnel_network(client_ip):
                     logging.info(f"[TCP] ✓ ACCEPTED connection from {addr}")
                     import threading
-                    threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+
+                    threading.Thread(
+                        target=handle_client, args=(conn, addr), daemon=True
+                    ).start()
                 else:
                     logging.warning(f"[TCP] ✗ REJECTED connection from {addr}")
-                    logging.warning(f"[TCP]   Reason: IP not in tunnel network {tunnel_network}")
+                    logging.warning(
+                        f"[TCP]   Reason: IP not in tunnel network {tunnel_network}"
+                    )
                     conn.close()
 
             except Exception as e:
@@ -170,6 +214,7 @@ def start_tcp_server():
     finally:
         server.close()
 
+
 # ------------------------ Peer Connector ------------------------ #
 def connect_to_peers():
     for peer in PEER_LIST:
@@ -179,7 +224,9 @@ def connect_to_peers():
             s = None
             acquired = client_semaphore.acquire(blocking=False)
             if not acquired:
-                logging.warning(f"[Peer] Max clients reached. Skipping connection to {ip}:{port}")
+                logging.warning(
+                    f"[Peer] Max clients reached. Skipping connection to {ip}:{port}"
+                )
                 break
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -187,11 +234,19 @@ def connect_to_peers():
                 s.connect((ip, port))
                 client_sockets.append(s)
                 logging.info(f"[TCP] Connected to peer {ip}:{port}")
-                threading.Thread(target=listen_to_peer, args=(s, ip, port), daemon=True).start()
+                threading.Thread(
+                    target=listen_to_peer, args=(s, ip, port), daemon=True
+                ).start()
                 request_ledger_sync()
                 break
-            except (ConnectionRefusedError, ConnectionResetError, ConnectionAbortedError) as e:
-                logging.warning(f"[TCP] Connection attempt {attempt} to {ip}:{port} failed: {e}")
+            except (
+                ConnectionRefusedError,
+                ConnectionResetError,
+                ConnectionAbortedError,
+            ) as e:
+                logging.warning(
+                    f"[TCP] Connection attempt {attempt} to {ip}:{port} failed: {e}"
+                )
                 time.sleep(RETRY_DELAY)
                 if s:
                     try:
@@ -200,7 +255,9 @@ def connect_to_peers():
                         pass
                     s.close()
                 if attempt == MAX_RETRIES:
-                    logging.warning(f"[TCP] Max retries reached for {ip}:{port}. Releasing semaphore.")
+                    logging.warning(
+                        f"[TCP] Max retries reached for {ip}:{port}. Releasing semaphore."
+                    )
                     client_semaphore.release()
             except Exception as e:
                 logging.error(f"[TCP] Unexpected error connecting to {ip}:{port} - {e}")
@@ -213,6 +270,7 @@ def connect_to_peers():
                 client_semaphore.release()
                 break
 
+
 # ------------------------ Ledger Sync ------------------------ #
 def request_ledger_sync():
     local_count = get_ledger_count()
@@ -224,8 +282,14 @@ def request_ledger_sync():
         last_hash = last_block[0]["hash"] if last_block else "0"
         last_prev_hash = last_block[0]["prev_hash"] if last_block else "0"
 
-    payload = {"last_hash": last_hash, "last_prev_hash": last_prev_hash, "total_count": local_count}
-    logging.info(f"[Sync] Sending SYNC_REQUEST with last_hash={last_hash} total_count={local_count}")
+    payload = {
+        "last_hash": last_hash,
+        "last_prev_hash": last_prev_hash,
+        "total_count": local_count,
+    }
+    logging.info(
+        f"[Sync] Sending SYNC_REQUEST with last_hash={last_hash} total_count={local_count}"
+    )
     for sock in client_sockets[:]:
         try:
             sock.send(f"SYNC_REQUEST:{json.dumps(payload)}\n".encode())
@@ -237,6 +301,7 @@ def request_ledger_sync():
             except:
                 pass
             sock.close()
+
 
 def handle_sync_request(conn, payload_json):
     try:
@@ -254,11 +319,19 @@ def handle_sync_request(conn, payload_json):
 
         missing_blocks = []
         with engine.connect() as conn_db:
-            result = conn_db.execute(text("""
+            result = (
+                conn_db.execute(
+                    text(
+                        """
                 SELECT sender, timestamp, message, prev_hash, hash
                 FROM ledger
                 ORDER BY id ASC
-            """)).mappings().all()
+            """
+                    )
+                )
+                .mappings()
+                .all()
+            )
 
             start_index = 0
             for i, b in enumerate(result):
@@ -275,13 +348,15 @@ def handle_sync_request(conn, payload_json):
                 ts = b["timestamp"]
                 if isinstance(ts, datetime):
                     ts = ts.strftime("%Y-%m-%d %H:%M:%S")
-                missing_blocks.append({
-                    "sender": b["sender"],
-                    "timestamp": ts,
-                    "message": b["message"],
-                    "prev_hash": b["prev_hash"],
-                    "hash": b["hash"]
-                })
+                missing_blocks.append(
+                    {
+                        "sender": b["sender"],
+                        "timestamp": ts,
+                        "message": b["message"],
+                        "prev_hash": b["prev_hash"],
+                        "hash": b["hash"],
+                    }
+                )
                 prev_hash = b["hash"]
 
         response_data = {"blocks": missing_blocks, "total_count": local_count}
@@ -289,6 +364,7 @@ def handle_sync_request(conn, payload_json):
         logging.info(f"[Sync] Sent {len(missing_blocks)} missing blocks to peer.")
     except Exception as e:
         logging.error(f"[Sync Request Error] {e}")
+
 
 def handle_sync_response(response_json):
     try:
@@ -306,16 +382,24 @@ def handle_sync_response(response_json):
             for block in peer_blocks:
                 exists = conn.execute(
                     text("SELECT COUNT(*) FROM ledger WHERE hash = :h"),
-                    {"h": block["hash"]}
+                    {"h": block["hash"]},
                 ).fetchone()[0]
                 if exists == 0:
                     conn.execute(
-                        text("INSERT INTO messages (sender, timestamp, message) VALUES (:sender, :timestamp, :message)"),
-                        {"sender": block["sender"], "timestamp": block["timestamp"], "message": block["message"]}
+                        text(
+                            "INSERT INTO messages (sender, timestamp, message) VALUES (:sender, :timestamp, :message)"
+                        ),
+                        {
+                            "sender": block["sender"],
+                            "timestamp": block["timestamp"],
+                            "message": block["message"],
+                        },
                     )
                     conn.execute(
-                        text("INSERT INTO ledger (sender, timestamp, message, prev_hash, hash) VALUES (:sender, :timestamp, :message, :prev_hash, :hash)"),
-                        block
+                        text(
+                            "INSERT INTO ledger (sender, timestamp, message, prev_hash, hash) VALUES (:sender, :timestamp, :message, :prev_hash, :hash)"
+                        ),
+                        block,
                     )
                     conn.commit()
                     blocks_added += 1
@@ -331,6 +415,7 @@ def handle_sync_response(response_json):
     except Exception as e:
         logging.error(f"[Sync Response Error] {e}")
         safe_emit("sync_status", {"status": "error"}, to_all=True)
+
 
 # ------------------------ Periodic Chain Validation ------------------------ #
 def periodic_ledger_sync():

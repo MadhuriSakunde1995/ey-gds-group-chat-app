@@ -2,9 +2,11 @@ import socket
 import psutil
 import logging
 import platform
+
 # import os
 from ipaddress import IPv4Network, IPv4Address
 from src.config import ADAPTER_NAME
+
 
 def get_connect_tunnel_ip(custom_interface_name=None):
     """
@@ -27,21 +29,25 @@ def get_connect_tunnel_ip(custom_interface_name=None):
                 if interface == custom_interface_name:
                     for addr in addrs:
                         if addr.family == socket.AF_INET:
-                            logging.info(f"[Tunnel] Found custom interface '{interface}': {addr.address}")
+                            logging.info(
+                                f"[Tunnel] Found custom interface '{interface}': {addr.address}"
+                            )
                             return addr.address, interface
-            logging.warning(f"[Tunnel] Custom interface '{custom_interface_name}' not found")
+            logging.warning(
+                f"[Tunnel] Custom interface '{custom_interface_name}' not found"
+            )
             return None, None
 
         # Platform-specific tunnel naming patterns
         tunnel_patterns = {
-            'Windows': ['connect tunnel', 'tap', 'openvpn', 'wireguard'],
-            'Darwin': ['connect tunnel', 'utun', 'tun', 'tap', 'ppp'],  # macOS
-            'Linux': ['connect tunnel', 'tun', 'tap', 'wg', 'vpn'],
-            'FreeBSD': ['connect tunnel', 'tun', 'tap', 'wg'],
+            "Windows": ["connect tunnel", "tap", "openvpn", "wireguard"],
+            "Darwin": ["connect tunnel", "utun", "tun", "tap", "ppp"],  # macOS
+            "Linux": ["connect tunnel", "tun", "tap", "wg", "vpn"],
+            "FreeBSD": ["connect tunnel", "tun", "tap", "wg"],
         }
 
         # Get patterns for current system (fallback to Linux patterns)
-        patterns = tunnel_patterns.get(system, tunnel_patterns['Linux'])
+        patterns = tunnel_patterns.get(system, tunnel_patterns["Linux"])
 
         for interface, addrs in psutil.net_if_addrs().items():
             interface_lower = interface.lower()
@@ -51,7 +57,9 @@ def get_connect_tunnel_ip(custom_interface_name=None):
                 if pattern in interface_lower:
                     for addr in addrs:
                         if addr.family == socket.AF_INET:  # IPv4
-                            logging.info(f"[Tunnel] Found tunnel on interface '{interface}': {addr.address}")
+                            logging.info(
+                                f"[Tunnel] Found tunnel on interface '{interface}': {addr.address}"
+                            )
                             return addr.address, interface
 
         logging.warning(f"[Tunnel] No tunnel adapter found on {system}")
@@ -111,7 +119,7 @@ def get_connect_tunnel_network():
                 for addr in addrs:
                     if addr.family == socket.AF_INET and addr.address == tunnel_ip:
                         # Get netmask (default to /24 if not available)
-                        netmask = getattr(addr, 'netmask', '255.255.255.0')
+                        netmask = getattr(addr, "netmask", "255.255.255.0")
                         network = IPv4Network(f"{addr.address}/{netmask}", strict=False)
                         logging.info(f"[Tunnel] Network range: {network}")
                         return network
@@ -157,7 +165,7 @@ def list_all_network_interfaces():
         for addr in addrs:
             if addr.family == socket.AF_INET:
                 logging.info(f"  IPv4: {addr.address}")
-                if hasattr(addr, 'netmask'):
+                if hasattr(addr, "netmask"):
                     logging.info(f"  Netmask: {addr.netmask}")
     logging.info("=" * 40)
 
@@ -174,6 +182,8 @@ def monitor_tunnel_status():
 
         if is_connect_tunnel_active():
             tunnel_ip, interface = get_connect_tunnel_ip(ADAPTER_NAME)
-            logging.debug(f"[Monitor] ✓ Connect Tunnel active: {interface} ({tunnel_ip})")
+            logging.debug(
+                f"[Monitor] ✓ Connect Tunnel active: {interface} ({tunnel_ip})"
+            )
         else:
             logging.warning("[Monitor] ⚠ Connect Tunnel is DOWN or disconnected!")

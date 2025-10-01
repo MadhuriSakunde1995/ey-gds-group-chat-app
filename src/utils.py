@@ -7,10 +7,12 @@ import pytz
 # Global reference to socketio instance
 _socketio = None
 
+
 def set_socketio(socketio_instance):
     """Set the global socketio instance"""
     global _socketio
     _socketio = socketio_instance
+
 
 def safe_emit(event, data, to_all=False, room=None, **kwargs):
     """Safe emit function to handle SocketIO events"""
@@ -37,15 +39,16 @@ def get_utc_timestamp():
     """Get current UTC timestamp in ISO format for blockchain consistency"""
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
+
 def convert_utc_to_local(utc_timestamp_str, target_timezone=USER_TIMEZONE):
     """Convert UTC timestamp to user's local timezone for display"""
     try:
         # Parse UTC timestamp - handle both formats
         if isinstance(utc_timestamp_str, str):
             # Try ISO format first (2025-09-24T07:48:33)
-            if 'T' in utc_timestamp_str:
+            if "T" in utc_timestamp_str:
                 # Remove microseconds if present and handle Z suffix
-                clean_timestamp = utc_timestamp_str.split('.')[0].replace('Z', '')
+                clean_timestamp = utc_timestamp_str.split(".")[0].replace("Z", "")
                 utc_dt = datetime.strptime(clean_timestamp, "%Y-%m-%dT%H:%M:%S")
             else:
                 # Standard format (2025-09-24 07:48:33)
@@ -53,7 +56,11 @@ def convert_utc_to_local(utc_timestamp_str, target_timezone=USER_TIMEZONE):
             utc_dt = utc_dt.replace(tzinfo=timezone.utc)
         else:
             # If it's already a datetime object, ensure it's UTC
-            utc_dt = utc_timestamp_str.replace(tzinfo=timezone.utc) if utc_timestamp_str.tzinfo is None else utc_timestamp_str.astimezone(timezone.utc)
+            utc_dt = (
+                utc_timestamp_str.replace(tzinfo=timezone.utc)
+                if utc_timestamp_str.tzinfo is None
+                else utc_timestamp_str.astimezone(timezone.utc)
+            )
 
         # Convert to target timezone
         target_tz = pytz.timezone(target_timezone)
